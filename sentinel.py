@@ -7,7 +7,6 @@ import requests
 import os
 
 # --- CONFIGURAÇÕES ---
-# As chaves são carregadas automaticamente pelo GitHub Actions a partir dos teus Secrets
 SERPAPI_KEY = os.environ.get('SERPAPI_KEY')
 FRED_API_KEY = os.environ.get('FRED_API_KEY')
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
@@ -25,21 +24,13 @@ RISK_TAXONOMY = {
 }
 
 def send_telegram_alert(message):
-    print(f"DEBUG: A tentar enviar mensagem: {message}")
-    print(f"DEBUG: Token: {'OK' if TELEGRAM_TOKEN else 'VAZIO'}")
-    print(f"DEBUG: ChatID: {TELEGRAM_CHAT_ID}")
-    
     if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         params = {'chat_id': TELEGRAM_CHAT_ID, 'text': message}
         try:
-            response = requests.get(url, params=params)
-            print(f"DEBUG: Resposta do Telegram: {response.status_code}")
-            print(f"DEBUG: Corpo da resposta: {response.text}")
+            requests.get(url, params=params)
         except Exception as e:
-            print(f"DEBUG: Erro de rede: {e}")
-    else:
-        print("DEBUG: ERRO CRÍTICO - Token ou ChatID não definidos no ambiente!")
+            print(f"Erro ao enviar Telegram: {e}")
 
 def get_fed_liquidity():
     try:
@@ -60,38 +51,25 @@ def get_weighted_sentiment():
             except: continue
     return total_risk_score
 
-def get_smart_money_metrics():
-    y10, pcr = 4.5, 0.85
-    try:
-        tnx = yf.download("^TNX", period="1mo", progress=False)
-        if not tnx.empty: y10 = float(tnx['Close'].iloc[-1])
-        vix = yf.download("^VIX", period="1mo", progress=False)
-        if not vix.empty: pcr = (float(vix['Close'].iloc[-1]) / 20.0)
-    except: pass
-    return y10, pcr
-
 def check_market_danger(ticker, name):
     df = yf.download(ticker, period="5y", progress=False)
     close = df['Close'].iloc[:, 0] if isinstance(df['Close'], pd.DataFrame) else df['Close']
     z_score = (close - close.ewm(span=200).mean()) / close.rolling(200).std()
-    liq = get_fed_liquidity()
+    
     risk = get_weighted_sentiment()
-    y10, pcr = get_smart_money_metrics()
     
-    is_danger = (z_score.iloc[-1] > 2.0 or risk > 50.0) and (liq <= 0 or y10 > 4.5 or pcr > 1.1)
+    # Lógica de Vigilância Antecipada
+    is_warning = (risk > 40.0 or z_score.iloc[-1] > 2.0)
     
-    status = "🚨 DANGER: ESTRUTURA FRÁGIL" if is_danger else "✅ NORMAL: Estável"
-    msg = f"{status}\n{name} | Z-Score: {z_score.iloc[-1]:.2f} | Risco: {risk:.2f} | Yield: {y10:.2f}% | PCR: {pcr:.2f}"
-    
-    print(msg)
-    if is_danger: 
-        # MUDANÇA TEMPORÁRIA: Forçamos o envio para testar a ligação
-    print("DEBUG: A forçar envio de teste...")
-    send_telegram_alert(f"TESTE DE LIGAÇÃO: {name} | Risco calculado: {risk:.2f}")
-    
-    # O código original (que só envia se houver perigo) continua aqui em baixo
-    if is_danger: 
+    if is_warning:
+        status = "⚠️ AVISO: Aumentar Vigilância" if risk > 40.0 else "🚨 DANGER: ESTRUTURA FRÁGIL"
+        motivo = "Sentimento negativo elevado nas notícias" if risk > 40.0 else "Indicadores técnicos em zona crítica"
+        msg = f"{status}\n{name} | Motivo: {motivo}\nRisco: {risk:.2f} | Z-Score: {z_score.iloc[-1]:.2f}"
+        
+        print(msg)
         send_telegram_alert(msg)
+    else:
+        print(f"✅ {name} estável. Risco: {risk:.2f}, Z-Score: {z_score.iloc[-1]:.2f}")
 
 if __name__ == "__main__":
     check_market_danger("^GSPC", "S&P 500")
