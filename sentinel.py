@@ -25,15 +25,21 @@ RISK_TAXONOMY = {
 }
 
 def send_telegram_alert(message):
+    print(f"DEBUG: A tentar enviar mensagem: {message}")
+    print(f"DEBUG: Token: {'OK' if TELEGRAM_TOKEN else 'VAZIO'}")
+    print(f"DEBUG: ChatID: {TELEGRAM_CHAT_ID}")
+    
     if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         params = {'chat_id': TELEGRAM_CHAT_ID, 'text': message}
         try:
-            requests.get(url, params=params)
+            response = requests.get(url, params=params)
+            print(f"DEBUG: Resposta do Telegram: {response.status_code}")
+            print(f"DEBUG: Corpo da resposta: {response.text}")
         except Exception as e:
-            print(f"Erro ao enviar Telegram: {e}")
+            print(f"DEBUG: Erro de rede: {e}")
     else:
-        print("Telegram credenciais em falta.")
+        print("DEBUG: ERRO CRÍTICO - Token ou ChatID não definidos no ambiente!")
 
 def get_fed_liquidity():
     try:
