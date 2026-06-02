@@ -3,10 +3,16 @@ from serpapi.google_search import GoogleSearch
 from textblob import TextBlob
 from fredapi import Fred
 import pandas as pd
+import requests
+import os
 
 # --- CONFIGURAÇÕES ---
-SERPAPI_KEY = "a1644bf7c1905ec6471d346e9415836c34db7284afd4d8dc699f988ab1b8fd49"
-FRED_API_KEY = "72c53afb3e2abb5183f02cc6fea5a554" 
+# As chaves são carregadas automaticamente pelo GitHub Actions a partir dos teus Secrets
+SERPAPI_KEY = os.environ.get('SERPAPI_KEY')
+FRED_API_KEY = os.environ.get('FRED_API_KEY')
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+
 fred = Fred(api_key=FRED_API_KEY)
 
 # MATRIZ INTEGRAL DE 200 TERMOS DE RISCO
@@ -17,6 +23,17 @@ RISK_TAXONOMY = {
     'MACRO': ['fed hike', 'quantitative tightening', 'interest rates', 'fiscal deficit', 'debt ceiling', 'treasury yield spike', 'hawkish fed', 'monetary policy error', 'currency devaluation', 'fx volatility', 'trade deficit', 'geo-political risk', 'protectionism', 'tariffs', 'supply chain disruption', 'energy crisis', 'oil shock', 'labor shortage', 'central bank intervention', 'hawkish rhetoric', 'dovish pivot', 'global slowdown', 'emerging market crisis', 'capital controls', 'reserve currency war', 'geopolitical conflict', 'war risk', 'sanctions', 'energy dependence', 'dependency risk', 'commodity prices', 'inflationary pressure', 'disinflation', 'real wage decline', 'fiscal policy', 'tax hike', 'spending cut', 'sovereign risk', 'international trade', 'global recession'],
     'MARKET': ['volatility', 'flash crash', 'sell-off', 'panic', 'retail mania', 'short squeeze', 'gamma squeeze', 'algo trading error', 'market crash', 'bear market', 'investor pessimism', 'capital outflow', 'index rebalancing', 'dark pool', 'high frequency trading anomaly', 'liquidity dry up', 'derivatives exposure', 'market manipulation', 'insider trading', 'fraud detection', 'accounting scandal', 'sec probe', 'investigation', 'corporate governance failure', 'investor sentiment', 'market depth', 'bid-ask spread', 'slippage', 'liquidity trap', 'leverage ratio', 'debt-to-equity', 'margin debt', 'option volume', 'fear index', 'vix spike', 'market correction', 'downgrade', 'negative outlook', 'investor apathy', 'herd behavior']
 }
+
+def send_telegram_alert(message):
+    if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        params = {'chat_id': TELEGRAM_CHAT_ID, 'text': message}
+        try:
+            requests.get(url, params=params)
+        except Exception as e:
+            print(f"Erro ao enviar Telegram: {e}")
+    else:
+        print("Telegram credenciais em falta.")
 
 def get_fed_liquidity():
     try:
@@ -38,34 +55,31 @@ def get_weighted_sentiment():
     return total_risk_score
 
 def get_smart_money_metrics():
-    """Calcula métricas de mercado usando proxies estáveis (VIX e TNX)"""
     y10, pcr = 4.5, 0.85
     try:
         tnx = yf.download("^TNX", period="1mo", progress=False)
         if not tnx.empty: y10 = float(tnx['Close'].iloc[-1])
-        
         vix = yf.download("^VIX", period="1mo", progress=False)
-        if not vix.empty:
-            vix_val = float(vix['Close'].iloc[-1])
-            pcr = (vix_val / 20.0) # VIX como proxy de proteção
+        if not vix.empty: pcr = (float(vix['Close'].iloc[-1]) / 20.0)
     except: pass
     return y10, pcr
 
 def check_market_danger(ticker, name):
-    print(f"\n--- Analisando {name} (Radar de Elite) ---")
     df = yf.download(ticker, period="5y", progress=False)
     close = df['Close'].iloc[:, 0] if isinstance(df['Close'], pd.DataFrame) else df['Close']
     z_score = (close - close.ewm(span=200).mean()) / close.rolling(200).std()
-    
     liq = get_fed_liquidity()
     risk = get_weighted_sentiment()
     y10, pcr = get_smart_money_metrics()
     
-    # Lógica de Elite: Perigo se o Z-Score > 2.0 E houver stress em qualquer um dos pilares
     is_danger = (z_score.iloc[-1] > 2.0 or risk > 50.0) and (liq <= 0 or y10 > 4.5 or pcr > 1.1)
     
-    print(f"Status: {'🚨 DANGER: ESTRUTURA FRÁGIL' if is_danger else '✅ NORMAL: Estável'}")
-    print(f"Z-Score: {z_score.iloc[-1]:.2f} | Risco: {risk:.2f} | Liquidez: {liq:.4f} | Yield 10Y: {y10:.2f}% | PCR Proxy: {pcr:.2f}")
+    status = "🚨 DANGER: ESTRUTURA FRÁGIL" if is_danger else "✅ NORMAL: Estável"
+    msg = f"{status}\n{name} | Z-Score: {z_score.iloc[-1]:.2f} | Risco: {risk:.2f} | Yield: {y10:.2f}% | PCR: {pcr:.2f}"
+    
+    print(msg)
+    if is_danger: 
+        send_telegram_alert(msg)
 
 if __name__ == "__main__":
     check_market_danger("^GSPC", "S&P 500")
