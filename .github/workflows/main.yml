@@ -7,18 +7,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Listar ficheiros
-        run: ls -R  # <--- ESTA LINHA VAI MOSTRAR ONDE O FICHEIRO ESTÁ
-      - name: Set up Python
+      - name: Onde estou e o que vejo?
+        run: |
+          pwd
+          ls -R
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
       - name: Install dependencies
         run: pip install yfinance fredapi textblob google-search-results pandas requests
-      - name: Run script
+      - name: Tentar correr radar.py
         env:
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python radar.py
+        run: |
+          if [ -f radar.py ]; then
+            python radar.py
+          else
+            echo "ERRO: radar.py nao encontrado na raiz. Procurando em subpastas..."
+            find . -name "radar.py"
+          fi
