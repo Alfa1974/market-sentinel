@@ -1,15 +1,14 @@
-import requests
 import os
+import requests
 
-TOKEN = os.environ.get('TELEGRAM_TOKEN')
-CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+token = os.environ.get('TELEGRAM_TOKEN')
+chat_id = os.environ.get('TELEGRAM_CHAT_ID')
 
-print(f"DEBUG: Token detetado? {'SIM' if TOKEN else 'NAO'}")
-print(f"DEBUG: ChatID detetado? {CHAT_ID}")
+print(f"DEBUG: A disparar teste de comunicação...")
 
-url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-params = {'chat_id': CHAT_ID, 'text': "TESTE DE LIGAÇÃO EFETUADO COM SUCESSO!"}
+url = f"https://api.telegram.org/bot{token}/sendMessage"
+params = {'chat_id': chat_id, 'text': "TESTE DE LIGAÇÃO: O SCRIPT ESTÁ A FUNCIONAR!"}
 
-response = requests.get(url, params=params)
-print(f"DEBUG: Resposta do Telegram: {response.status_code}")
-print(f"DEBUG: Corpo da resposta: {response.text}")
+res = requests.get(url, params=params)
+print(f"DEBUG: Resposta do Telegram: {res.status_code}")
+print(f"DEBUG: Conteúdo: {res.text}")
