@@ -79,6 +79,12 @@ def check_market_danger(ticker, name):
     
     print(msg)
     if is_danger: 
+        # MUDANÇA TEMPORÁRIA: Forçamos o envio para testar a ligação
+    print("DEBUG: A forçar envio de teste...")
+    send_telegram_alert(f"TESTE DE LIGAÇÃO: {name} | Risco calculado: {risk:.2f}")
+    
+    # O código original (que só envia se houver perigo) continua aqui em baixo
+    if is_danger: 
         send_telegram_alert(msg)
 
 if __name__ == "__main__":
