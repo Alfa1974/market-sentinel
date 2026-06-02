@@ -14,7 +14,7 @@ TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
 fred = Fred(api_key=FRED_API_KEY)
 
-# MATRIZ INTEGRAL DE 200 TERMOS DE RISCO
+# MATRIZ INTEGRAL DE TERMOS DE RISCO
 RISK_TAXONOMY = {
     'CRITICAL': ['default', 'bankruptcy', 'liquidity crisis', 'margin call', 'bank run', 'solvency', 'collapse', 'insolvency', 'chapter 11', 'bond market crash', 'sovereign debt crisis', 'counterparty risk', 'fire sale', 'systemic risk', 'capital flight', 'bank failure', 'shadow banking', 'credit freeze', 'funding gap', 'bailout', 'haircut', 'contagion', 'bank holiday', 'distressed debt', 'repossession', 'bankrupt', 'financial collapse', 'credit default swap', 'subprime', 'negative equity', 'capital adequacy', 'run on bank', 'panic selling', 'fiat collapse', 'debt trap', 'credit crunch', 'seizure of assets', 'frozen accounts', 'hyperinflation', 'currency peg break'],
     'SEVERE': ['recession', 'inflation spike', 'stagflation', 'credit crunch', 'debt bubble', 'yield curve inversion', 'deflation', 'economic contraction', 'GDP decline', 'consumer confidence plummet', 'unemployment surge', 'structural unemployment', 'fiscal cliff', 'austerity', 'negative growth', 'productivity slump', 'commodity crash', 'depression', 'stagflationary', 'recessionary', 'trade war', 'supply chain collapse', 'commodity shortage', 'energy poverty', 'wage stagnation', 'cost of living crisis', 'poverty rate', 'business failure', 'layoffs', 'hiring freeze', 'corporate earnings miss', 'margin compression', 'market saturation', 'overcapacity', 'deindustrialization', 'protectionist policy', 'sovereign downgrade', 'fiscal mismanagement', 'public debt', 'unfunded liabilities'],
@@ -24,19 +24,17 @@ RISK_TAXONOMY = {
 }
 
 def send_telegram_alert(message):
+    print(f"DEBUG: Tentando enviar via Telegram...")
     if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         params = {'chat_id': TELEGRAM_CHAT_ID, 'text': message}
         try:
-            requests.get(url, params=params)
+            response = requests.get(url, params=params)
+            print(f"DEBUG: Resposta Telegram (Status {response.status_code}): {response.text}")
         except Exception as e:
-            print(f"Erro ao enviar Telegram: {e}")
-
-def get_fed_liquidity():
-    try:
-        m2 = fred.get_series('M2SL')
-        return float((m2.iloc[-1] - m2.iloc[-2]) / m2.iloc[-2])
-    except: return 0.0
+            print(f"DEBUG: Erro de rede ao enviar Telegram: {e}")
+    else:
+        print("DEBUG: Erro - Token ou ChatID em falta!")
 
 def get_weighted_sentiment():
     total_risk_score = 0
@@ -58,15 +56,10 @@ def check_market_danger(ticker, name):
     
     risk = get_weighted_sentiment()
     
-    # Lógica de Vigilância Antecipada
-    is_warning = (risk > 40.0 or z_score.iloc[-1] > 2.0)
-    
-    if is_warning:
-        status = "⚠️ AVISO: Aumentar Vigilância" if risk > 40.0 else "🚨 DANGER: ESTRUTURA FRÁGIL"
-        motivo = "Sentimento negativo elevado nas notícias" if risk > 40.0 else "Indicadores técnicos em zona crítica"
-        msg = f"{status}\n{name} | Motivo: {motivo}\nRisco: {risk:.2f} | Z-Score: {z_score.iloc[-1]:.2f}"
-        
-        print(msg)
+    # Lógica forçada: Se Risco > 40 OU Z-Score > 2.0, envia alerta.
+    if risk > 40.0 or z_score.iloc[-1] > 2.0:
+        msg = f"⚠️ ALERTA DE MERCADO: {name}\nMotivo: Risco={risk:.2f}, Z-Score={z_score.iloc[-1]:.2f}"
+        print(f"DEBUG: Gatilho de alerta ativado! Risco: {risk:.2f}, Z-Score: {z_score.iloc[-1]:.2f}")
         send_telegram_alert(msg)
     else:
         print(f"✅ {name} estável. Risco: {risk:.2f}, Z-Score: {z_score.iloc[-1]:.2f}")
