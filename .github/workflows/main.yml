@@ -1,0 +1,22 @@
+name: MarketSentinel Daily
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: pip install yfinance fredapi textblob google-search-results pandas
+      - name: Run script
+        env:
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python sentinel.py
